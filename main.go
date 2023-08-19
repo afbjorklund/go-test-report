@@ -72,6 +72,7 @@ type (
 		sizeFlag   string
 		groupSize  int
 		listFlag   string
+		inputFlag  string
 		outputFlag string
 		verbose    bool
 	}
@@ -126,10 +127,19 @@ func initRootCommand() (*cobra.Command, *templateData, *cmdFlags) {
 			tmplData.numOfTestsPerGroup = flags.groupSize
 			tmplData.ReportTitle = flags.titleFlag
 			tmplData.OutputFilename = flags.outputFlag
-			if err := checkIfStdinIsPiped(); err != nil {
-				return err
+			var stdin *os.File
+			if flags.inputFlag != "" {
+				file, err := os.Open(flags.inputFlag)
+				if err != nil {
+					return err
+				}
+				stdin = file
+			} else {
+				if err := checkIfStdinIsPiped(); err != nil {
+					return err
+				}
+				stdin = os.Stdin
 			}
-			stdin := os.Stdin
 			stdinScanner := bufio.NewScanner(stdin)
 			testReportHTMLTemplateFile, _ := os.Create(tmplData.OutputFilename)
 			reportFileWriter := bufio.NewWriter(testReportHTMLTemplateFile)
@@ -199,6 +209,11 @@ func initRootCommand() (*cobra.Command, *templateData, *cmdFlags) {
 		"l",
 		"",
 		"the JSON module list")
+	rootCmd.PersistentFlags().StringVarP(&flags.inputFlag,
+		"input",
+		"i",
+		"",
+		"the JSON input file")
 	rootCmd.PersistentFlags().StringVarP(&flags.outputFlag,
 		"output",
 		"o",
