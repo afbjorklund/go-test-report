@@ -1,6 +1,7 @@
 /**
  * @typedef TestStatus
  * @property {string} TestName
+ * @property {string} DisplayName
  * @property {string} Package
  * @property {number} ElapsedTime
  * @property {Array.<string>} Output
@@ -102,7 +103,7 @@ window.GoTestReport = function (elements) {
         const testId = /**@type {string}*/ target.attributes['id'].value
         testGroupList += `<div class="testGroupRow ${testPassedStatus}" data-groupid="${testId}" data-index="${i}">
         <span class="testStatus ${testPassedStatus}">${(testPassed) ? '&check' : (testSkipped ? '&dash' : '&cross')};</span>
-        <span class="testTitle">${testResult.TestName}</span>
+        <span class="testTitle">${(testResult.DisplayName) ? testResult.DisplayName : testResult.TestName}</span>
         <span class="testDuration"><span>${testResult.ElapsedTime}s </span>⏱</span>
       </div>`
       }

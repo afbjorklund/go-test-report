@@ -95,6 +95,7 @@ Flags:
   -h, --help            help for go-test-report
   -o, --output string   the HTML output file (default "test_report.html")
   -s, --size string     the size (in pixels) of the clickable indicator for test result groups (default "24")
+  -x, --testdox         display test names as sentences using testdox
   -t, --title string    the title text shown in the test report (default "go-test-report")
   -v, --verbose         while processing, show the complete output from go test
 
@@ -114,6 +115,14 @@ To change the default title shown in the `test_report.html` file.
 $ go test -json | go-test-report -t "My Test Report"
 ```
 
+To display the test names as sentences (with spaces) using TestDox.
+
+```bash
+$ go test -json | go-test-report -x
+```
+
+* `TestValidIsTrueForValidInputs` -> _Valid is true for valid inputs_
+* `TestValidIsFalseForInvalidInputs` -> _Valid is false for invalid inputs_
 
 The default number of tests in a _test group_ can be changed using the `-g` or `--groupSize` flag. For example, the following command will change the default number of tests in a group to 8.
 

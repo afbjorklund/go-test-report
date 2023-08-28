@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bitfield/gotestdox"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )
@@ -36,6 +37,7 @@ type (
 
 	testStatus struct {
 		TestName           string
+		DisplayName        string
 		Package            string
 		ElapsedTime        float64
 		Output             []string
@@ -74,6 +76,7 @@ type (
 		listFlag   string
 		outputFlag string
 		verbose    bool
+		testdox    bool
 	}
 
 	goListJSONModule struct {
@@ -209,6 +212,11 @@ func initRootCommand() (*cobra.Command, *templateData, *cmdFlags) {
 		"v",
 		false,
 		"while processing, show the complete output from go test ")
+	rootCmd.PersistentFlags().BoolVarP(&flags.testdox,
+		"testdox",
+		"x",
+		false,
+		"display test names as sentences using testdox")
 
 	return rootCmd, tmplData, flags
 }
@@ -238,6 +246,9 @@ func readTestDataFromStdIn(stdinScanner *bufio.Scanner, flags *cmdFlags, cmd *co
 					TestName: goTestOutputRow.TestName,
 					Package:  goTestOutputRow.Package,
 					Output:   []string{},
+				}
+				if flags.testdox {
+					status.DisplayName = gotestdox.Prettify(status.TestName)
 				}
 				allTests[key] = status
 			} else {
