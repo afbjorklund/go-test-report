@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bitfield/gotestdox"
+	"github.com/bitfield/gotestdox/pkg/gotestdox"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )
