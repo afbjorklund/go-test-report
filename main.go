@@ -57,8 +57,19 @@ type (
 		ReportTitle                    string
 		JsCode                         template.JS
 		numOfTestsPerGroup             int
+		JsonOutput                     bool
 		OutputFilename                 string
 		TestExecutionDate              string
+	}
+
+	jsonDocument struct {
+		Total         int
+		Duration      string //time.Duration
+		Passed        int
+		Skipped       int
+		Failed        int
+		ExecutionDate string //time.Time
+		TestResults   []*testGroupData
 	}
 
 	testGroupData struct {
@@ -72,6 +83,7 @@ type (
 		sizeFlag   string
 		groupSize  int
 		listFlag   string
+		jsonFlag   bool
 		outputFlag string
 		verbose    bool
 	}
@@ -125,6 +137,7 @@ func initRootCommand() (*cobra.Command, *templateData, *cmdFlags) {
 			}
 			tmplData.numOfTestsPerGroup = flags.groupSize
 			tmplData.ReportTitle = flags.titleFlag
+			tmplData.JsonOutput = flags.jsonFlag
 			tmplData.OutputFilename = flags.outputFlag
 			if err := checkIfStdinIsPiped(); err != nil {
 				return err
@@ -199,6 +212,10 @@ func initRootCommand() (*cobra.Command, *templateData, *cmdFlags) {
 		"l",
 		"",
 		"the JSON module list")
+	rootCmd.PersistentFlags().BoolVar(&flags.jsonFlag,
+		"json",
+		false,
+		"output json document instead of html")
 	rootCmd.PersistentFlags().StringVarP(&flags.outputFlag,
 		"output",
 		"o",
@@ -453,6 +470,19 @@ func generateReport(tmplData *templateData, allTests map[string]*testStatus, tes
 	td := time.Now()
 	tmplData.TestExecutionDate = fmt.Sprintf("%s %d, %d %02d:%02d:%02d",
 		td.Month(), td.Day(), td.Year(), td.Hour(), td.Minute(), td.Second())
+	if tmplData.JsonOutput {
+		encoder := json.NewEncoder(reportFileWriter)
+		testDocument := jsonDocument{
+			Total:         tmplData.NumOfTests,
+			Duration:      elapsedTestTime.String(),
+			Passed:        tmplData.NumOfTestPassed,
+			Skipped:       tmplData.NumOfTestSkipped,
+			Failed:        tmplData.NumOfTestFailed,
+			ExecutionDate: td.Format(time.RFC3339),
+			TestResults:   tmplData.TestResults,
+		}
+		return encoder.Encode(testDocument)
+	}
 	if err := tpl.Execute(reportFileWriter, tmplData); err != nil {
 		return err
 	}
