@@ -13,6 +13,7 @@ import (
 	"go/token"
 	"go/types"
 	"html/template"
+	"io"
 	"os"
 	"os/exec"
 	"sort"
@@ -83,6 +84,7 @@ type (
 		sizeFlag   string
 		groupSize  int
 		listFlag   string
+		dataFlag   bool
 		jsonFlag   bool
 		outputFlag string
 		verbose    bool
@@ -155,18 +157,26 @@ func initRootCommand() (*cobra.Command, *templateData, *cmdFlags) {
 					e = err
 				}
 			}()
-			startTestTime := time.Now()
-			allPackageNames, allTests, err := readTestDataFromStdIn(stdinScanner, flags, cmd)
-			if err != nil {
-				return errors.New(err.Error() + "\n")
-			}
-			elapsedTestTime := time.Since(startTestTime)
+			var allTests map[string]*testStatus
 			// used to the location of test functions in test go files by package and test function name.
 			var testFileDetailByPackage testFileDetailsByPackage
-			if flags.listFlag != "" {
-				testFileDetailByPackage, err = getAllDetails(flags.listFlag)
+			var elapsedTestTime time.Duration
+			var err error
+			if flags.dataFlag {
+				elapsedTestTime, allTests, err = readTestDataFromDataDocument(stdin, flags, cmd)
 			} else {
-				testFileDetailByPackage, err = getPackageDetails(allPackageNames)
+				startTestTime := time.Now()
+				var allPackageNames map[string]*types.Nil
+				allPackageNames, allTests, err = readTestDataFromStdIn(stdinScanner, flags, cmd)
+				if err != nil {
+					return errors.New(err.Error() + "\n")
+				}
+				elapsedTestTime = time.Since(startTestTime)
+				if flags.listFlag != "" {
+					testFileDetailByPackage, err = getAllDetails(flags.listFlag)
+				} else {
+					testFileDetailByPackage, err = getPackageDetails(allPackageNames)
+				}
 			}
 			if err != nil {
 				return err
@@ -212,6 +222,10 @@ func initRootCommand() (*cobra.Command, *templateData, *cmdFlags) {
 		"l",
 		"",
 		"the JSON module list")
+	rootCmd.PersistentFlags().BoolVar(&flags.dataFlag,
+		"data",
+		false,
+		"input test data instead of test2json")
 	rootCmd.PersistentFlags().BoolVar(&flags.jsonFlag,
 		"json",
 		false,
@@ -228,6 +242,34 @@ func initRootCommand() (*cobra.Command, *templateData, *cmdFlags) {
 		"while processing, show the complete output from go test ")
 
 	return rootCmd, tmplData, flags
+}
+
+func readTestDataFromDataDocument(stdin io.Reader, flags *cmdFlags, cmd *cobra.Command) (elapsedTime time.Duration, allTests map[string]*testStatus, e error) {
+	allTests = map[string]*testStatus{}
+
+	data := json.NewDecoder(stdin)
+	testDocument := jsonDocument{}
+	if err := data.Decode(&testDocument); err != nil {
+		return 0, nil, err
+	}
+
+	elapsedTime, err := time.ParseDuration(testDocument.Duration)
+	if err != nil {
+		return 0, nil, err
+	}
+	_, err = time.Parse(testDocument.ExecutionDate, time.RFC3339)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	for _, group := range testDocument.TestResults {
+		for _, test := range group.TestResults {
+			key := test.Package + "." + test.TestName
+			allTests[key] = test
+		}
+	}
+
+	return elapsedTime, allTests, nil
 }
 
 func readTestDataFromStdIn(stdinScanner *bufio.Scanner, flags *cmdFlags, cmd *cobra.Command) (allPackageNames map[string]*types.Nil, allTests map[string]*testStatus, e error) {
@@ -441,11 +483,13 @@ func generateReport(tmplData *templateData, allTests map[string]*testStatus, tes
 		if len(tmplData.TestResults) == tgID {
 			tmplData.TestResults = append(tmplData.TestResults, &testGroupData{})
 		}
-		// add file info(name and position; line and col) associated with the test function
-		testFileInfo := testFileDetailByPackage[status.Package][status.TestName]
-		if testFileInfo != nil {
-			status.TestFileName = testFileInfo.FileName
-			status.TestFunctionDetail = testFileInfo.TestFunctionFilePos
+		if testFileDetailByPackage != nil {
+			// add file info(name and position; line and col) associated with the test function
+			testFileInfo := testFileDetailByPackage[status.Package][status.TestName]
+			if testFileInfo != nil {
+				status.TestFileName = testFileInfo.FileName
+				status.TestFunctionDetail = testFileInfo.TestFunctionFilePos
+			}
 		}
 		tmplData.TestResults[tgID].TestResults = append(tmplData.TestResults[tgID].TestResults, status)
 		if !status.Passed {
